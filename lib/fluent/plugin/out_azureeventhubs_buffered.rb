@@ -48,16 +48,17 @@ module Fluent::Plugin
     end
 
     def write(chunk)
+      payload_array = []
       chunk.msgpack_each { |tag, time, record|
-        p record.to_s
         if @include_tag
           record['tag'] = tag
         end
         if @include_time
           record[@tag_time_name] = time
         end
-        @sender.send_w_properties(record, @message_properties)
+        payload_array << record
       }
+      @sender.send_w_properties(payload_array, @message_properties)
     end
   end
 end

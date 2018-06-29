@@ -4,6 +4,7 @@ class AzureEventHubsHttpSender
     require 'openssl'
     require 'base64'
     require 'net/http'
+    require 'typhoeus'
     require 'json'
     require 'cgi'
     require 'time'
@@ -14,6 +15,7 @@ class AzureEventHubsHttpSender
     @proxy_port = proxy_port
     @open_timeout = open_timeout
     @read_timeout = read_timeout
+    @hydra = Typhoeus::Hydra.hydra
 
     if @connection_string.count(';') != 2
       raise "Connection String format is not correct"
@@ -43,32 +45,33 @@ class AzureEventHubsHttpSender
 
   private :generate_sas_token
 
-  def send(payload)
-    send_w_properties(payload, nil)
+  def send(payload_array)
+    send_w_properties(payload_array, nil)
   end
 
-  def send_w_properties(payload, properties)
+  def send_w_properties(payload_array, properties)
+    payload_array = [payload_array] unless payload_array.is_a? Array
     token = generate_sas_token(@uri.to_s)
-    headers = {
-      'Content-Type' => 'application/atom+xml;type=entry;charset=utf-8',
-      'Authorization' => token
-    }
-    if not properties.nil?
-      headers = headers.merge(properties)
+    payload_array.each do |payload|
+      headers = {
+        'Content-Type' => 'application/atom+xml;type=entry;charset=utf-8',
+        'Authorization' => token
+      }
+      if not properties.nil?
+        headers = headers.merge(properties)
+      end
+      options = {
+        method: :post,
+        body: p.to_json,
+        headers: headers
+      }
+      if (!@proxy_addr.to_s.empty?)
+        options[:proxy] = "#{@proxy_addr}:#{@proxy_port}"
+      end
+      req = Typhoeus::Request.new(@uri, options)
+      @hydra.queue req
     end
-    if (@proxy_addr.to_s.empty?)
-    	https = Net::HTTP.new(@uri.host, @uri.port)
-        https.open_timeout = @open_timeout
-        https.read_timeout = @read_timeout
-    else
-    	https = Net::HTTP.new(@uri.host, @uri.port,@proxy_addr,@proxy_port)
-        https.open_timeout = @open_timeout
-        https.read_timeout = @read_timeout
-    end
-    https.use_ssl = true
-    req = Net::HTTP::Post.new(@uri.request_uri, headers)
-    req.body = payload.to_json
-    res = https.request(req)
+    @hydra.run
     rescue Timeout::Error, Errno::EINVAL, Errno::ECONNRESET, EOFError, Errno::ETIMEDOUT, Net::HTTPBadResponse, Net::HTTPHeaderSyntaxError, Net::ProtocolError => e
   end
 end
