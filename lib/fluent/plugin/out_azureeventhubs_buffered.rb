@@ -25,6 +25,10 @@ module Fluent::Plugin
       config_set_default :chunk_keys, ['tag']
     end
 
+    def multi_workers_ready?
+      true
+    end
+
     def configure(conf)
       compat_parameters_convert(conf, :buffer, :inject)
       super
