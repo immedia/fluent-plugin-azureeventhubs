@@ -37,7 +37,7 @@ module Fluent::Plugin
         raise NotImplementedError
       else
         require_relative 'azureeventhubs/http'
-        @sender = AzureEventHubsHttpSender.new(@connection_string, @hub_name, @expiry_interval,@proxy_addr,@proxy_port,@open_timeout,@read_timeout)
+        @sender = AzureEventHubsHttpSender.new(@connection_string, @hub_name, log, @expiry_interval,@proxy_addr,@proxy_port,@open_timeout,@read_timeout)
       end
       raise Fluent::ConfigError, "'tag' in chunk_keys is required." if not @chunk_key_tag
     end

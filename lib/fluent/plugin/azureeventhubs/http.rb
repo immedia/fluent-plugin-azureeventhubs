@@ -1,6 +1,6 @@
 
 class AzureEventHubsHttpSender
-  def initialize(connection_string, hub_name, expiry=3600,proxy_addr='',proxy_port=3128,open_timeout=60,read_timeout=60)
+  def initialize(connection_string, hub_name, log, expiry=3600,proxy_addr='',proxy_port=3128,open_timeout=60,read_timeout=60)
     require 'openssl'
     require 'base64'
     require 'net/http'
@@ -10,6 +10,7 @@ class AzureEventHubsHttpSender
     require 'time'
     @connection_string = connection_string
     @hub_name = hub_name
+    @log = log
     @expiry_interval = expiry
     @proxy_addr = proxy_addr
     @proxy_port = proxy_port
@@ -52,7 +53,7 @@ class AzureEventHubsHttpSender
   def send_w_properties(payload_array, properties)
     payload_array = [payload_array] unless payload_array.is_a? Array
     token = generate_sas_token(@uri.to_s)
-    payload_array.each do |payload|
+    requests = payload_array.map do |payload|
       headers = {
         'Content-Type' => 'application/atom+xml;type=entry;charset=utf-8',
         'Authorization' => token
@@ -70,8 +71,16 @@ class AzureEventHubsHttpSender
       end
       req = Typhoeus::Request.new(@uri, options)
       @hydra.queue req
+      req
     end
     @hydra.run
+    requests.each do |r|
+      if r.response.code >= 400
+        @log.warn r.response.code
+        @log.warn r.response.headers
+        @log.warn r.response.body
+      end
+    end
     rescue Timeout::Error, Errno::EINVAL, Errno::ECONNRESET, EOFError, Errno::ETIMEDOUT, Net::HTTPBadResponse, Net::HTTPHeaderSyntaxError, Net::ProtocolError => e
   end
 end
