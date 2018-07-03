@@ -62,7 +62,7 @@ class AzureEventHubsHttpSender
       end
       options = {
         method: :post,
-        body: p.to_json,
+        body: payload.to_json,
         headers: headers
       }
       if (!@proxy_addr.to_s.empty?)
