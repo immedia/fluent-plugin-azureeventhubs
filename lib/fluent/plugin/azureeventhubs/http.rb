@@ -16,7 +16,6 @@ class AzureEventHubsHttpSender
     @proxy_port = proxy_port
     @open_timeout = open_timeout
     @read_timeout = read_timeout
-    @hydra = Typhoeus::Hydra.hydra
 
     if @connection_string.count(';') != 2
       raise "Connection String format is not correct"
@@ -53,6 +52,7 @@ class AzureEventHubsHttpSender
   def send_w_properties(payload_array, properties)
     payload_array = [payload_array] unless payload_array.is_a? Array
     token = generate_sas_token(@uri.to_s)
+    hydra = Typhoeus::Hydra.hydra
     requests = payload_array.map do |payload|
       headers = {
         'Content-Type' => 'application/atom+xml;type=entry;charset=utf-8',
@@ -70,16 +70,21 @@ class AzureEventHubsHttpSender
         options[:proxy] = "#{@proxy_addr}:#{@proxy_port}"
       end
       req = Typhoeus::Request.new(@uri, options)
-      @hydra.queue req
+      hydra.queue req
       req
     end
-    @hydra.run
-    requests.each do |r|
-      if r.response.code >= 400
-        @log.warn r.response.code
-        @log.warn r.response.headers
-        @log.warn r.response.body
+    begin
+      hydra.run
+      requests.each do |r|
+        if r.response.code >= 400
+          @log.warn r.response.code rescue 'Error getting code'
+          @log.warn r.response.headers rescue 'Error getting headers'
+          @log.warn r.response.body rescue 'Error getting body'
+        end
       end
+    rescue NoMethodError => e
+      @log.warn e
+      @log.warn e.backtrace
     end
     rescue Timeout::Error, Errno::EINVAL, Errno::ECONNRESET, EOFError, Errno::ETIMEDOUT, Net::HTTPBadResponse, Net::HTTPHeaderSyntaxError, Net::ProtocolError => e
   end
